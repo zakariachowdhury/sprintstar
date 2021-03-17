@@ -1,2 +1,2 @@
 #!/bin/bash
-streamlit run streamlit_app.py
+streamlit run sprintstars.py

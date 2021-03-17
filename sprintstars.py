@@ -1,10 +1,9 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-import numpy as np
 import time
 
-PAGE_TITLE = 'Stars of the Sprint'
+PAGE_TITLE = 'The Stars of the Sprint'
 APP_ICON = ':star:'
 
 OPTION_NOMINATE_STAR = 'Nominate a star'
@@ -29,12 +28,12 @@ team_members_dict = {
     'Ava': [Nomination('Richard', 'Amazing work in this sprint')],
     'Richard': [],
     'Lyman': [],
-    'Ruth': [Nomination('Claire'), Nomination('Neil', 'Completed all the tasks', True)],
+    'Ruth': [],
     'Claire': [],
     'Brandon': [],
-    'Caroline': [],
+    'Caroline': [Nomination('Neil', None, True), Nomination('Ruth')],
     'Neil': [],
-    'Thomas': [],
+    'Thomas': [Nomination('Claire'), Nomination('Brandon'), Nomination('Lyman', 'Completed all the tasks', True)],
     'Jane': []
 }
 
@@ -75,8 +74,7 @@ def display_result(reveal_result = False):
     star_members_dict = get_star_members_dict()
     start_list = list(star_members_dict.keys())
 
-    if len(start_list):
-    
+    if len(start_list) >= 2:
         if not reveal_result:
             start_list = ['Star ' + str(len(start_list) - i) for i, _ in enumerate(start_list)]
 
@@ -84,25 +82,29 @@ def display_result(reveal_result = False):
         ax.barh(start_list, votes, color='lightcoral')
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.set_xlabel('Total votes')
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.set_axisbelow(True)
+        ax.grid(color='#eeeeee')
         st.pyplot(fig)
 
-        if reveal_result:
-            i = 1
-            top_votes = 0
-            star_members_dict = get_star_members_dict(True)
-            for name, nominations_list in iter(star_members_dict.items()):
-                if i == 1:
-                    top_votes = len(nominations_list)
+    if reveal_result:
+        i = 1
+        top_votes = 0
+        star_members_dict = get_star_members_dict(True)
+        for name, nominations_list in iter(star_members_dict.items()):
+            if i == 1:
+                top_votes = len(nominations_list)
 
-                if len(nominations_list):
-                    st.markdown(f'### {i}. {name} ({len(nominations_list)} {"votes" if len(nominations_list) > 1 else "vote"}) {":star:" if len(nominations_list) == top_votes else ""}')
-                    for nomination in nominations_list:
-                        if nomination.feedback is not None and len(nomination.feedback):
-                            st.markdown(f'- {nomination.feedback}' + (f' *-{nomination.nominator}*' if not nomination.is_anonymous else ''))
-                    i += 1
-            st.balloons()
-    elif reveal_result:
-        st.warning('No one participated today')
+            if len(nominations_list):
+                st.markdown(f'### {i}. {name} ({len(nominations_list)} {"votes" if len(nominations_list) > 1 else "vote"}) {":star:" if len(nominations_list) == top_votes else ""}')
+                for nomination in nominations_list:
+                    if nomination.feedback is not None and len(nomination.feedback):
+                        st.markdown(f'- {nomination.feedback}' + (f' *-{nomination.nominator}*' if not nomination.is_anonymous else ''))
+                i += 1
+        st.balloons()
 
 def display_progress(reveal_result):
     total_participated = get_total_participants()
@@ -123,7 +125,11 @@ def option_host_poll():
     if sprint_name:
         open_poll = st.checkbox('Open the poll', False)
         if open_poll:
-            reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict))
+            reveal_result = False
+
+            star_members_dict = get_star_members_dict()
+            if len(star_members_dict.keys()):
+                reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict))
 
             reveal_result = display_progress(reveal_result)
 
