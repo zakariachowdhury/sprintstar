@@ -4,27 +4,32 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 import time
 
-PAGE_TITLE = 'Star of the Sprint'
+PAGE_TITLE = 'Stars of the Sprint'
 APP_ICON = ':star:'
 
-OPTION_NOMINATE_STAR = 'Nominate Star'
-OPTION_HOST_POLL = 'Host Poll'
+OPTION_NOMINATE_STAR = 'Nominate a star'
+OPTION_HOST_POLL = 'Host the poll'
 OPTION_SETTINGS = 'Settings'
+
+LABEL_PARTICIPATING = 'Participating'
+LABEL_NOT_PARTICIPATING = 'Not participating today'
 
 class Nomination:
     nominator = None
     feedback = None
+    is_anonymous = False
 
-    def __init__(self, nominator, feedback=None) -> None:
+    def __init__(self, nominator, feedback=None, is_anonymous=False) -> None:
         self.nominator = nominator
         self.feedback = feedback
+        self.is_anonymous = is_anonymous
 
 
 team_members_dict = {
     'Ava': [Nomination('Richard', 'Amazing work in this sprint')],
     'Richard': [],
     'Lyman': [],
-    'Ruth': [Nomination('Claire'), Nomination('Neil', 'Completed all the tasks')],
+    'Ruth': [Nomination('Claire'), Nomination('Neil', 'Completed all the tasks', True)],
     'Claire': [],
     'Brandon': [],
     'Caroline': [],
@@ -41,73 +46,88 @@ def get_total_participants():
 
 def display_nomination_form():
     members_list = ['']
+    feedback = None
     members_list.extend(list(team_members_dict.keys()))
     members_list = sorted(members_list)
 
-    star_member = st.selectbox('Nominate a star for this sprint:', members_list)
+    nominator = st.selectbox('Your name:', members_list)
+    if nominator:
+        is_not_participating = st.checkbox(LABEL_NOT_PARTICIPATING)
 
-    if len(star_member):
-        feedback = st.text_area('What are the reasons for nominating ' + star_member + '? (optional)')
-        members_list.remove(star_member)
-        nominator = st.selectbox('Your name:', members_list)
+        if not is_not_participating:
+            is_anonymous = st.checkbox('Nominate anonymously')
+            members_list.remove(nominator)
+            star_member = st.selectbox('Nominate a star for this sprint:', members_list)
 
-        if nominator:
-            if st.checkbox('Submit'):
-                team_members_dict[star_member].append(Nomination(nominator, feedback))
-                return True
+            if len(star_member):
+                feedback = st.text_area('What are the reasons for nominating ' + star_member + '? (optional)')
+                members_list.remove(star_member)
+            
+                if st.checkbox('Submit'):
+                    team_members_dict[star_member].append(Nomination(nominator, feedback, is_anonymous))
+                    return True
+        else:
+            return True
     return False
 
 def display_result(reveal_result = False):
     fig, ax = plt.subplots()
     star_members_dict = get_star_members_dict()
     start_list = list(star_members_dict.keys())
+
+    if len(start_list):
     
-    if not reveal_result:
-        start_list = ['Star ' + str(len(start_list) - i) for i, _ in enumerate(start_list)]
+        if not reveal_result:
+            start_list = ['Star ' + str(len(start_list) - i) for i, _ in enumerate(start_list)]
 
-    votes = [len(v) for _, v in star_members_dict.items()]
-    ax.barh(start_list, votes, color='lightcoral')
-    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    st.pyplot(fig)
+        votes = [len(v) for _, v in star_members_dict.items()]
+        ax.barh(start_list, votes, color='lightcoral')
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.set_xlabel('Total votes')
+        st.pyplot(fig)
 
-    if reveal_result:
-        i = 1
-        top_votes = 0
-        star_members_dict = get_star_members_dict(True)
-        for name, nominations_list in iter(star_members_dict.items()):
-            if i == 1:
-                top_votes = len(nominations_list)
+        if reveal_result:
+            i = 1
+            top_votes = 0
+            star_members_dict = get_star_members_dict(True)
+            for name, nominations_list in iter(star_members_dict.items()):
+                if i == 1:
+                    top_votes = len(nominations_list)
 
-            if len(nominations_list):
-                st.markdown(f'### {i}. {name} ({len(nominations_list)} {"votes" if len(nominations_list) > 1 else "vote"}) {":star:" if len(nominations_list) == top_votes else ""}')
-                for nomination in nominations_list:
-                    if nomination.feedback is not None and len(nomination.feedback):
-                        st.markdown(f'- {nomination.feedback} *-{nomination.nominator}*')
-                i += 1
-        st.balloons()
+                if len(nominations_list):
+                    st.markdown(f'### {i}. {name} ({len(nominations_list)} {"votes" if len(nominations_list) > 1 else "vote"}) {":star:" if len(nominations_list) == top_votes else ""}')
+                    for nomination in nominations_list:
+                        if nomination.feedback is not None and len(nomination.feedback):
+                            st.markdown(f'- {nomination.feedback}' + (f' *-{nomination.nominator}*' if not nomination.is_anonymous else ''))
+                    i += 1
+            st.balloons()
+    elif reveal_result:
+        st.warning('No one participated today')
 
 def display_progress(reveal_result):
     total_participated = get_total_participants()
     total_members = len(team_members_dict)
     if not reveal_result:
-        st.info('Poll in progress...')
+        st.info('The poll is in progress, please wait...')
         st.progress(total_participated / total_members)
     
-    if total_participated == total_members:
-        st.markdown(f'*Yay, we have full house today!*')
-    else:
-        st.markdown(f'*{total_participated} out of {total_members} participated*')
+        if total_participated == total_members:
+            st.markdown(f'*Yay, we have full house today, everyone participated!*')
+        else:
+            st.markdown(f'*{total_participated} out of {total_members}*')
 
     return reveal_result
 
 def option_host_poll():
-    open_poll = st.checkbox('Open the poll', False)
-    if open_poll:
-        reveal_result = st.checkbox('Reveal the result', get_total_participants() == len(team_members_dict))
+    sprint_name = st.text_input('Sprint Name:')
+    if sprint_name:
+        open_poll = st.checkbox('Open the poll', False)
+        if open_poll:
+            reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict))
 
-        reveal_result = display_progress(reveal_result)
+            reveal_result = display_progress(reveal_result)
 
-        display_result(reveal_result)
+            display_result(reveal_result)
 
 
 def option_nominate_star():
@@ -119,12 +139,13 @@ def option_nominate_star():
     
     if reveal_result or submitted:
         reveal_result = display_progress(reveal_result)
-        display_result(reveal_result)
+        if reveal_result:
+            display_result(reveal_result)
 
 def option_settings():
     #st.write(list(team_members_dict.keys()))
-    team_members = '\n'.join(list(team_members_dict.keys()))
-    st.text_area('Team Members:', team_members)
+    team_members = ', '.join(list(team_members_dict.keys()))
+    st.text_area('Participant Names (comma separated):', team_members)
     st.button('Save')
 
 def main():
