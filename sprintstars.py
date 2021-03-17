@@ -6,6 +6,8 @@ import time
 import json
 import os
 import ast
+from threading import Lock
+import st_state_patch
 
 import sys
 sys.path = list(set(['config'] + sys.path))
@@ -176,7 +178,7 @@ def option_host_poll():
 
             star_members_dict = get_star_members_dict()
             if len(star_members_dict.keys()):
-                reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict))
+                reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict) or reveal_result)
 
             reveal_result = display_progress(reveal_result)
             sprint_dict[TODAY]['is_poll_closed'] = reveal_result
@@ -222,4 +224,11 @@ def main():
         option_nominate_star()
     elif option == OPTION_SETTINGS:
         option_settings()
-main()
+
+
+s = st.GlobalState(key="mySate")
+if not s:
+    s.lock = Lock()
+
+with s.lock:
+    main()
