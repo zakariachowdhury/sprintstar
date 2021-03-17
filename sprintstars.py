@@ -1,7 +1,19 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+from datetime import datetime
 import time
+import json
+import os
+import ast
+
+import sys
+sys.path = list(set(['config'] + sys.path))
+
+try:
+    from config import sprint
+except:
+    pass
 
 PAGE_TITLE = 'The Stars of the Sprint'
 APP_ICON = ':star:'
@@ -12,6 +24,10 @@ OPTION_SETTINGS = 'Settings'
 
 LABEL_PARTICIPATING = 'Participating'
 LABEL_NOT_PARTICIPATING = 'Not participating today'
+
+CONFIG_DIR = 'config/'
+SPRINT_CONFIG_FILENAME = CONFIG_DIR + 'sprint.py'
+TODAY = str(datetime.now().date())
 
 class Nomination:
     nominator = None
@@ -25,17 +41,45 @@ class Nomination:
 
 
 team_members_dict = {
-    'Ava': [Nomination('Richard', 'Amazing work in this sprint')],
+    'Ava': [Nomination('Richard', 'Amazing work in this sprint').__dict__],
     'Richard': [],
     'Lyman': [],
     'Ruth': [],
     'Claire': [],
     'Brandon': [],
-    'Caroline': [Nomination('Neil', None, True), Nomination('Ruth')],
+    'Caroline': [Nomination('Neil', None, True).__dict__, Nomination('Ruth').__dict__],
     'Neil': [],
-    'Thomas': [Nomination('Claire'), Nomination('Brandon'), Nomination('Lyman', 'Completed all the tasks', True)],
+    'Thomas': [Nomination('Claire').__dict__, Nomination('Brandon').__dict__, Nomination('Lyman', 'Completed all the tasks', True).__dict__],
     'Jane': []
 }
+
+sprint_dict = {
+    TODAY: {
+        'name': '',
+        'members': team_members_dict,
+        'is_poll_open': False,
+        'is_poll_closed': False
+    }
+}
+
+def save_sprint_config():
+    global sprint_dict
+    with open(SPRINT_CONFIG_FILENAME, 'w') as f:
+        f.write(str(sprint_dict))
+
+def load_spring_config():
+    if not os.path.exists(SPRINT_CONFIG_FILENAME):
+        save_sprint_config()
+        from config import sprint
+
+    try:
+        with open(SPRINT_CONFIG_FILENAME) as f:
+            data = f.read()
+            return eval(data)
+    except Exception as e:
+        print(e)
+        pass
+    return None
 
 def get_star_members_dict(reverse = False):
     return {k: v for k, v in sorted(team_members_dict.items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
@@ -63,7 +107,7 @@ def display_nomination_form():
                 members_list.remove(star_member)
             
                 if st.checkbox('Submit'):
-                    team_members_dict[star_member].append(Nomination(nominator, feedback, is_anonymous))
+                    team_members_dict[star_member].append(Nomination(nominator, feedback, is_anonymous).__dict__)
                     return True
         else:
             return True
@@ -101,8 +145,8 @@ def display_result(reveal_result = False):
             if len(nominations_list):
                 st.markdown(f'### {i}. {name} ({len(nominations_list)} {"votes" if len(nominations_list) > 1 else "vote"}) {":star:" if len(nominations_list) == top_votes else ""}')
                 for nomination in nominations_list:
-                    if nomination.feedback is not None and len(nomination.feedback):
-                        st.markdown(f'- {nomination.feedback}' + (f' *-{nomination.nominator}*' if not nomination.is_anonymous else ''))
+                    if nomination['feedback'] is not None and len(nomination['feedback']):
+                        st.markdown(f'- {nomination["feedback"]}' + (f' *-{nomination["nominator"]}*' if not nomination["is_anonymous"] else ''))
                 i += 1
         st.balloons()
 
@@ -121,19 +165,24 @@ def display_progress(reveal_result):
     return reveal_result
 
 def option_host_poll():
-    sprint_name = st.text_input('Sprint Name:')
+    global sprint_dict
+    sprint_name = st.text_input('Sprint Name:', sprint_dict[TODAY]['name'])
     if sprint_name:
-        open_poll = st.checkbox('Open the poll', False)
+        sprint_dict[TODAY]['name'] = sprint_name
+        open_poll = st.checkbox('Open the poll', sprint_dict[TODAY]['is_poll_open'])
+        sprint_dict[TODAY]['is_poll_open'] = open_poll
         if open_poll:
-            reveal_result = False
+            reveal_result = sprint_dict[TODAY]['is_poll_closed']
 
             star_members_dict = get_star_members_dict()
             if len(star_members_dict.keys()):
                 reveal_result = st.checkbox('Close the poll / Reveal names', get_total_participants() == len(team_members_dict))
 
             reveal_result = display_progress(reveal_result)
+            sprint_dict[TODAY]['is_poll_closed'] = reveal_result
 
             display_result(reveal_result)
+        save_sprint_config()
 
 
 def option_nominate_star():
@@ -149,15 +198,17 @@ def option_nominate_star():
             display_result(reveal_result)
 
 def option_settings():
-    #st.write(list(team_members_dict.keys()))
     team_members = ', '.join(list(team_members_dict.keys()))
     st.text_area('Participant Names (comma separated):', team_members)
     st.button('Save')
 
 def main():
-    st.set_page_config(page_title=PAGE_TITLE, page_icon=APP_ICON)
+    global sprint_dict
 
+    st.set_page_config(page_title=PAGE_TITLE, page_icon=APP_ICON)
     st.title(PAGE_TITLE)
+
+    sprint_dict = load_spring_config()
 
     option = st.sidebar.radio('Select an option:', [
         OPTION_NOMINATE_STAR,
