@@ -1,3 +1,7 @@
+# Project config files
+config/sprint.py
+config/members.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
