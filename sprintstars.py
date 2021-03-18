@@ -103,6 +103,9 @@ def get_star_members_dict(reverse = False):
 def get_total_participants():
     return sum([len(v) for _, v in team_members_dict.items()])
 
+def display_github_source_button():
+    st.markdown('<iframe src="https://ghbtns.com/github-btn.html?user=zakariachowdhury&repo=sprintstars&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>', unsafe_allow_html=True)
+
 def display_nomination_form():
     global team_members_dict
     sprint_name = get_sprint_config('name', '')
@@ -243,6 +246,8 @@ def option_nominate_star():
             display_result(is_poll_closed)
 
 def option_settings():
+    display_github_source_button()
+    st.subheader('Settings')    
     team_members = ', '.join(list(team_members_dict.keys()))
     st.text_area('Participant Names (comma separated):', team_members)
     st.button('Save')
