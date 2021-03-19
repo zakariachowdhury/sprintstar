@@ -14,6 +14,7 @@ sys.path = list(set(['config'] + sys.path))
 
 try:
     from config import sprint
+    from config import members
 except:
     pass
 
@@ -29,6 +30,7 @@ LABEL_NOT_PARTICIPATING = 'Not participating today'
 
 CONFIG_DIR = 'config/'
 SPRINT_CONFIG_FILENAME = CONFIG_DIR + 'sprint.py'
+MEMBERS_CONFIG_FILENAME = CONFIG_DIR + 'members.py'
 TODAY = str(datetime.now().date())
 
 class Nomination:
@@ -41,20 +43,6 @@ class Nomination:
         self.feedback = feedback
         self.is_anonymous = is_anonymous
 
-
-team_members_dict = {
-    'Ava': [Nomination('Richard', 'Amazing work in this sprint').__dict__],
-    'Richard': [],
-    'Lyman': [],
-    'Ruth': [],
-    'Claire': [],
-    'Brandon': [],
-    'Caroline': [Nomination('Neil', None, True).__dict__, Nomination('Ruth').__dict__],
-    'Neil': [],
-    'Thomas': [Nomination('Claire').__dict__, Nomination('Brandon').__dict__, Nomination('Lyman', 'Completed all the tasks', True).__dict__],
-    'Jane': []
-}
-
 SPRINT_DEFAULT_VALUES = {
         'name': '',
         'members': {},
@@ -63,30 +51,38 @@ SPRINT_DEFAULT_VALUES = {
     }
 
 sprint_config = {}
+members_list = []
 
 def set_sprint_default_values(force=False):
     global sprint_config
     if TODAY not in sprint_config.keys() or force:
         sprint_config[TODAY] = SPRINT_DEFAULT_VALUES
 
-def save_sprint_configs_into_file():
-    global sprint_config
-    with open(SPRINT_CONFIG_FILENAME, 'w') as f:
-        f.write(str(sprint_config))
+def save_obj_into_file(config_dict, filename):
+    with open(filename, 'w') as f:
+        f.write(str(config_dict))
 
-def load_spring_configs_from_file():
-    global sprint_config
-    if not os.path.exists(SPRINT_CONFIG_FILENAME):
-        save_sprint_configs_into_file()
-        from config import sprint # to force auto refresh page on file change
+def load_obj_from_file(filename, default={}):
+    if not os.path.exists(filename):
+        save_obj_into_file(default, filename)
 
     try:
-        with open(SPRINT_CONFIG_FILENAME) as f:
-            sprint_config = eval(f.read())
+        with open(filename) as f:
+            return eval(f.read())
     except Exception as e:
         print(e)
         pass
-    return None
+    return default
+
+def save_sprint_configs_into_file():
+    global sprint_config
+    save_obj_into_file(sprint_config, SPRINT_CONFIG_FILENAME)
+    from config import sprint # to force auto refresh page on file change
+
+def load_sprint_configs_from_file():
+    global sprint_config
+    sprint_config = load_obj_from_file(SPRINT_CONFIG_FILENAME)
+    from config import sprint
 
 def get_sprint_config(key, default=None):
     global sprint_config
@@ -97,17 +93,51 @@ def set_sprint_config(key, value):
     if TODAY in sprint_config.keys() and key in sprint_config[TODAY].keys():
         sprint_config[TODAY][key] = value
 
+def save_members_list_into_file():
+    global members_list
+    save_obj_into_file(sorted(members_list), MEMBERS_CONFIG_FILENAME)
+    from config import members
+
+def load_members_list_from_file():
+    global members_list
+    members_list = load_obj_from_file(MEMBERS_CONFIG_FILENAME, [])
+    from config import members
+
+def get_team_members_default_dict():
+    return {m:[] for m in members_list}
+
 def get_star_members_dict(reverse = False):
-    return {k: v for k, v in sorted(team_members_dict.items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
+    return {k: v for k, v in sorted(get_sprint_config('members').items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
 
 def get_total_participants():
-    return sum([len(v) for _, v in team_members_dict.items()])
+    return sum([len(v) for _, v in get_sprint_config('members').items()])
+
+def is_already_nominated(member_name):
+    for member, nomination_list in get_sprint_config('members').items():
+        for nomination in nomination_list:
+            if nomination['nominator'] == member_name:
+                return True
+    return False
+
+def already_participated_members_list():
+    already_participated = []
+    for _, nomination_list in get_sprint_config('members').items():
+        for nomination in nomination_list:
+            already_participated.append(nomination['nominator'])
+    return already_participated
+
+def get_waiting_for_members_list():
+    global members_list
+    return list(set(members_list) - set(already_participated_members_list()))
+
+def display_empty_team_members_names_warning():
+    st.warning('Please save team members names to get started')
 
 def display_github_source_button():
     st.markdown('<iframe src="https://ghbtns.com/github-btn.html?user=zakariachowdhury&repo=sprintstars&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>', unsafe_allow_html=True)
 
 def display_nomination_form():
-    global team_members_dict
+    global members_list
     sprint_name = get_sprint_config('name', '')
     is_poll_open = get_sprint_config('is_poll_open', False)
     is_poll_closed = get_sprint_config('is_poll_closed', False)
@@ -117,29 +147,27 @@ def display_nomination_form():
     elif is_poll_closed:
         st.info('The poll has been closed')
     else:
-        members_list = ['']
+        members_dropdown_list = ['']
         feedback = None
-        members_list.extend(list(team_members_dict.keys()))
-        members_list = sorted(members_list)
+        members_dropdown_list.extend(members_list)
 
-        nominator = st.selectbox('Select your name:', members_list)
+        nominator = st.selectbox('Select your name:', members_dropdown_list)
         if nominator:
-            is_not_participating = st.checkbox(LABEL_NOT_PARTICIPATING)
-
-            if not is_not_participating:
-                is_anonymous = st.checkbox('Nominate anonymously')
-                members_list.remove(nominator)
-                star_member = st.selectbox('Nominate a star for this sprint:', members_list)
+            if is_already_nominated(nominator):
+                return True
+            else:
+                members_dropdown_list.remove(nominator)
+                star_member = st.selectbox('Nominate a star for this sprint:', members_dropdown_list)
 
                 if len(star_member):
                     feedback = st.text_area('What are the reasons for nominating ' + star_member + '? (optional)')
-                    members_list.remove(star_member)
-                
-                    if st.checkbox('Submit'):
-                        team_members_dict[star_member].append(Nomination(nominator, feedback, is_anonymous).__dict__)
+                    is_anonymous = st.checkbox('Nominate anonymously')
+                    if st.button('Submit') and not is_already_nominated(nominator):
+                        team_nominations_dict = get_sprint_config('members')
+                        team_nominations_dict[star_member].append(Nomination(nominator, feedback, is_anonymous).__dict__)
+                        set_sprint_config('members', team_nominations_dict)
+                        save_sprint_configs_into_file()
                         return True
-            else:
-                return True
     return False
 
 def display_result(reveal_result = False):
@@ -182,8 +210,9 @@ def display_result(reveal_result = False):
             st.warning('No one participated today')
 
 def display_progress(reveal_result):
+    global members_list
     total_participated = get_total_participants()
-    total_members = len(team_members_dict)
+    total_members = len(members_list)
     if not reveal_result:
         st.info('The poll is in progress...')
         st.progress(total_participated / total_members)
@@ -192,8 +221,13 @@ def display_progress(reveal_result):
             st.markdown(f'*Yay, we have full house today, everyone participated!*')
         else:
             st.markdown(f'*{total_participated} out of {total_members}*')
+            if total_participated / total_members > 0.7:
+                waiting_for_list = ', '.join(get_waiting_for_members_list())
+                if len(waiting_for_list):
+                    st.markdown(f'*Waiting for {waiting_for_list}...*')
 
 def option_host_poll():
+    global team_nominations_dict
     sprint_name = get_sprint_config('name', '')
 
     is_poll_open = get_sprint_config('is_poll_open', False)
@@ -208,25 +242,24 @@ def option_host_poll():
         set_sprint_default_values()
         set_sprint_config('name', sprint_name)
         if not is_poll_open:
-            is_poll_open = st.button('Open the poll for nominations', is_poll_open)
-            set_sprint_config('is_poll_open', is_poll_open)
+            if st.button('Open the poll for nominations', is_poll_open):
+                is_poll_open = True
+                set_sprint_config('is_poll_open', is_poll_open)
+                set_sprint_config('members', get_team_members_default_dict())
 
         if is_poll_open:
             display_progress(is_poll_closed)
             display_result(is_poll_closed)
 
-            if not is_poll_closed:
-                if st.button('Close the poll / Reveal names'):
+            if not is_poll_closed and get_total_participants():
+                if st.button('Close the poll / Reveal names') or len(get_waiting_for_members_list()) == 0:
+                    st.balloons()
                     set_sprint_config('is_poll_closed', True)
                     is_poll_closed = True
-            
-            #star_members_dict = get_star_members_dict()
-            #if len(star_members_dict.keys()):
-                #get_total_participants() == len(team_members_dict)
 
             if is_poll_closed:
                 st.markdown('---')
-                if st.button(f'Delete the poll'):
+                if st.button(f'Delete the poll to start over'):
                     set_sprint_default_values(True)
         save_sprint_configs_into_file()
 
@@ -244,28 +277,40 @@ def option_nominate_star():
         display_progress(is_poll_closed)
         if is_poll_closed:
             display_result(is_poll_closed)
+            st.info('The poll has been closed for this sprint')            
 
 def option_settings():
+    global members_list
     display_github_source_button()
-    st.subheader('Settings')    
-    team_members = ', '.join(list(team_members_dict.keys()))
-    st.text_area('Participant Names (comma separated):', team_members)
-    st.button('Save')
+    st.subheader('Settings')
+    if len(members_list) == 0:
+        display_empty_team_members_names_warning()
+    members_str = ', '.join(members_list)
+    members_str = st.text_area('Team Members Names (comma separated):', members_str)
+    if st.button('Save') and len(members_str):
+        members_list = [m.strip() for m in members_str.split(',')]
+        save_members_list_into_file()
 
 def main():
+    global members_list
     st.set_page_config(page_title=PAGE_TITLE, page_icon=APP_ICON)
     st.title(PAGE_TITLE)
     
-    load_spring_configs_from_file()
+    load_sprint_configs_from_file()
+    load_members_list_from_file()
 
-    # global sprint_config
-    # st.write(sprint_config)
+    option_list = []
 
-    option = st.sidebar.radio('Select an option:', [
-        OPTION_NOMINATE_STAR,
-        OPTION_HOST_POLL,
-        OPTION_SETTINGS
-    ])
+    if len(members_list):
+        option_list = [
+            OPTION_NOMINATE_STAR,
+            OPTION_HOST_POLL,
+            OPTION_SETTINGS
+        ]
+    else:
+        option_list = [OPTION_SETTINGS]
+
+    option = st.sidebar.radio('Select an option:', option_list)
 
     if option == OPTION_HOST_POLL:
         option_host_poll()
