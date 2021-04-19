@@ -23,7 +23,7 @@ APP_ICON = ':star:'
 
 OPTION_NOMINATE_STAR = 'Nominate stars'
 OPTION_HOST_POLL = 'Host the poll'
-OPTION_HISTORY = 'History'
+OPTION_HISTORY = 'Past sprints'
 OPTION_SETTINGS = 'Settings'
 
 LABEL_PARTICIPATING = 'Participating'
@@ -203,7 +203,7 @@ def display_result(reveal_result = False, sprint_date=TODAY):
     if reveal_result:
         i = 1
         top_votes = 0
-        star_members_dict = get_star_members_dict(True)
+        star_members_dict = get_star_members_dict(True, sprint_date=sprint_date)
         if len(star_members_dict.items()):
             for name, nominations_list in iter(star_members_dict.items()):
                 if i == 1:
@@ -290,14 +290,14 @@ def option_nominate_star():
 
 def option_history():
     global sprint_config
-    st.subheader('History')
+    st.subheader(OPTION_HISTORY)
     sprint_names = ['']
-    sprint_names.extend([sprint_date + '  (' + sprint['name'] + ')' for sprint_date, sprint in sprint_config.items()])
+    sprint_names.extend([sprint_date + '  (' + sprint['name'] + ')' for sprint_date, sprint in sprint_config.items() if len(sprint['name'])])
 
     if len(sprint_names):
         selected_sprint_name = st.selectbox('Select a sprint:', sprint_names)
         for sprint_date, sprint in sprint_config.items():
-            if sprint['name'] in selected_sprint_name:
+            if len(sprint['name']) and sprint['name'] in selected_sprint_name:
                 display_result(True, sprint_date=sprint_date)
 
 def option_settings():
