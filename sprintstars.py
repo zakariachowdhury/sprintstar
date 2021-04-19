@@ -23,6 +23,7 @@ APP_ICON = ':star:'
 
 OPTION_NOMINATE_STAR = 'Nominate stars'
 OPTION_HOST_POLL = 'Host the poll'
+OPTION_HISTORY = 'History'
 OPTION_SETTINGS = 'Settings'
 
 LABEL_PARTICIPATING = 'Participating'
@@ -55,10 +56,10 @@ SPRINT_DEFAULT_VALUES = {
 sprint_config = {}
 members_list = []
 
-def set_sprint_default_values(force=False):
+def set_sprint_default_values(force=False, sprint_date=TODAY):
     global sprint_config
-    if TODAY not in sprint_config.keys() or force:
-        sprint_config[TODAY] = SPRINT_DEFAULT_VALUES
+    if sprint_date not in sprint_config.keys() or force:
+        sprint_config[sprint_date] = SPRINT_DEFAULT_VALUES
 
 def save_obj_into_file(config_dict, filename):
     with open(filename, 'w') as f:
@@ -86,14 +87,14 @@ def load_sprint_configs_from_file():
     sprint_config = load_obj_from_file(SPRINT_CONFIG_FILENAME)
     from config import sprint
 
-def get_sprint_config(key, default=None):
+def get_sprint_config(key, default=None, sprint_date=TODAY):
     global sprint_config
-    return sprint_config[TODAY][key] if TODAY in sprint_config.keys() and key in sprint_config[TODAY].keys() else default
+    return sprint_config[sprint_date][key] if sprint_date in sprint_config.keys() and key in sprint_config[sprint_date].keys() else default
 
-def set_sprint_config(key, value):
+def set_sprint_config(key, value, sprint_date=TODAY):
     global sprint_config
-    if TODAY in sprint_config.keys() and key in sprint_config[TODAY].keys():
-        sprint_config[TODAY][key] = value
+    if sprint_date in sprint_config.keys() and key in sprint_config[sprint_date].keys():
+        sprint_config[sprint_date][key] = value
 
 def save_members_list_into_file():
     global members_list
@@ -108,8 +109,8 @@ def load_members_list_from_file():
 def get_team_members_default_dict():
     return {m:[] for m in members_list}
 
-def get_star_members_dict(reverse = False):
-    return {k: v for k, v in sorted(get_sprint_config('members').items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
+def get_star_members_dict(reverse = False, sprint_date=TODAY):
+    return {k: v for k, v in sorted(get_sprint_config('members', sprint_date=sprint_date).items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
 
 def is_already_nominated(member_name):
     for member, nomination_list in get_sprint_config('members').items():
@@ -178,9 +179,9 @@ def display_nomination_form():
                         return True
     return False
 
-def display_result(reveal_result = False):
+def display_result(reveal_result = False, sprint_date=TODAY):
     fig, ax = plt.subplots()
-    star_members_dict = get_star_members_dict()
+    star_members_dict = get_star_members_dict(sprint_date=sprint_date)
     start_list = list(star_members_dict.keys())
 
     if len(start_list) >= 2:
@@ -287,6 +288,18 @@ def option_nominate_star():
             display_result(is_poll_closed)
             st.info('The poll has been closed for this sprint')            
 
+def option_history():
+    global sprint_config
+    st.subheader('History')
+    sprint_names = ['']
+    sprint_names.extend([sprint_date + '  (' + sprint['name'] + ')' for sprint_date, sprint in sprint_config.items()])
+
+    if len(sprint_names):
+        selected_sprint_name = st.selectbox('Select a sprint:', sprint_names)
+        for sprint_date, sprint in sprint_config.items():
+            if sprint['name'] in selected_sprint_name:
+                display_result(True, sprint_date=sprint_date)
+
 def option_settings():
     global members_list
     display_github_source_button()
@@ -313,6 +326,7 @@ def main():
         option_list = [
             OPTION_NOMINATE_STAR,
             OPTION_HOST_POLL,
+            OPTION_HISTORY,
             OPTION_SETTINGS
         ]
     else:
@@ -324,6 +338,8 @@ def main():
         option_host_poll()
     elif option == OPTION_NOMINATE_STAR:
         option_nominate_star()
+    elif option == OPTION_HISTORY:
+        option_history()
     elif option == OPTION_SETTINGS:
         option_settings()
 
