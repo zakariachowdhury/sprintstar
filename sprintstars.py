@@ -21,7 +21,7 @@ except:
 PAGE_TITLE = 'The Stars of the Sprint'
 APP_ICON = ':star:'
 
-OPTION_NOMINATE_STAR = 'Nominate a star'
+OPTION_NOMINATE_STAR = 'Nominate stars'
 OPTION_HOST_POLL = 'Host the poll'
 OPTION_SETTINGS = 'Settings'
 
@@ -32,6 +32,8 @@ CONFIG_DIR = 'config/'
 SPRINT_CONFIG_FILENAME = CONFIG_DIR + 'sprint.py'
 MEMBERS_CONFIG_FILENAME = CONFIG_DIR + 'members.py'
 TODAY = str(datetime.now().date())
+
+MAX_NOMINATIONS = 3
 
 class Nomination:
     nominator = None
@@ -109,9 +111,6 @@ def get_team_members_default_dict():
 def get_star_members_dict(reverse = False):
     return {k: v for k, v in sorted(get_sprint_config('members').items(), key=lambda item: len(item[1]) if not reverse else -len(item[1])) if len(v)}
 
-def get_total_participants():
-    return sum([len(v) for _, v in get_sprint_config('members').items()])
-
 def is_already_nominated(member_name):
     for member, nomination_list in get_sprint_config('members').items():
         for nomination in nomination_list:
@@ -124,7 +123,10 @@ def already_participated_members_list():
     for _, nomination_list in get_sprint_config('members').items():
         for nomination in nomination_list:
             already_participated.append(nomination['nominator'])
-    return already_participated
+    return list(set(already_participated))
+
+def get_total_participants():
+    return len(already_participated_members_list())
 
 def get_waiting_for_members_list():
     global members_list
@@ -157,14 +159,20 @@ def display_nomination_form():
                 return True
             else:
                 members_dropdown_list.remove(nominator)
-                star_member = st.selectbox('Nominate a star for this sprint:', members_dropdown_list)
+                star_members = st.multiselect(f'Nominate stars for this sprint (max {MAX_NOMINATIONS}):', members_dropdown_list)
 
-                if len(star_member):
-                    feedback = st.text_area('What are the reasons for nominating ' + star_member + '? (optional)')
+                if len(star_members) > 0:
+                    feedbacks = []
+                    for star_member in star_members:
+                        feedbacks.append(st.text_area('Reasons for nominating ' + star_member + ' (optional):'))
                     is_anonymous = st.checkbox('Nominate anonymously')
-                    if st.button('Submit') and not is_already_nominated(nominator):
+
+                    if len(star_members) > MAX_NOMINATIONS:
+                        st.warning(f'You can nominate up to {MAX_NOMINATIONS} stars.')
+                    elif st.button('Submit') and not is_already_nominated(nominator):
                         team_nominations_dict = get_sprint_config('members')
-                        team_nominations_dict[star_member].append(Nomination(nominator, feedback, is_anonymous).__dict__)
+                        for i, star_member in enumerate(star_members):
+                            team_nominations_dict[star_member].append(Nomination(nominator, feedbacks[i], is_anonymous).__dict__)
                         set_sprint_config('members', team_nominations_dict)
                         save_sprint_configs_into_file()
                         return True
@@ -221,7 +229,7 @@ def display_progress(reveal_result):
             st.markdown(f'*Yay, we have full house today, everyone participated!*')
         else:
             st.markdown(f'*{total_participated} out of {total_members}*')
-            if total_participated / total_members > 0.7:
+            if total_participated / total_members > 0.5:
                 waiting_for_list = ', '.join(get_waiting_for_members_list())
                 if len(waiting_for_list):
                     st.markdown(f'*Waiting for {waiting_for_list}...*')
