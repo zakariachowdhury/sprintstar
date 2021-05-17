@@ -161,7 +161,7 @@ def display_nomination_form():
                 return True
             else:
                 members_dropdown_list.remove(nominator)
-                star_members = st.multiselect(f'Nominate stars for this sprint (max {MAX_NOMINATIONS}):', members_dropdown_list)
+                star_members = st.multiselect(f'Nominate stars for this sprint:', members_dropdown_list)
 
                 if len(star_members) > 0:
                     feedbacks = []
