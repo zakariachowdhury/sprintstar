@@ -35,6 +35,7 @@ MEMBERS_CONFIG_FILENAME = CONFIG_DIR + 'members.py'
 TODAY = str(datetime.now().date())
 
 MAX_NOMINATIONS = 3
+MIN_FEEDBACK_CHAR_LENGTH = 3
 
 class Nomination:
     nominator = None
@@ -165,18 +166,21 @@ def display_nomination_form():
                 if len(star_members) > 0:
                     feedbacks = []
                     for star_member in star_members:
-                        feedbacks.append(st.text_area('Reasons for nominating ' + star_member + ' (optional):'))
+                        feedbacks.append(st.text_area('Reasons for nominating ' + star_member + ':'))
                     is_anonymous = st.checkbox('Nominate anonymously')
 
                     if len(star_members) > MAX_NOMINATIONS:
                         st.warning(f'You can nominate up to {MAX_NOMINATIONS} stars.')
-                    elif st.button('Submit') and not is_already_nominated(nominator):
-                        team_nominations_dict = get_sprint_config('members')
-                        for i, star_member in enumerate(star_members):
-                            team_nominations_dict[star_member].append(Nomination(nominator, feedbacks[i], is_anonymous).__dict__)
-                        set_sprint_config('members', team_nominations_dict)
-                        save_sprint_configs_into_file()
-                        return True
+                    elif all([len(f) >= MIN_FEEDBACK_CHAR_LENGTH for f in feedbacks]):
+                        if st.button('Submit') and not is_already_nominated(nominator):
+                            team_nominations_dict = get_sprint_config('members')
+                            for i, star_member in enumerate(star_members):
+                                team_nominations_dict[star_member].append(Nomination(nominator, feedbacks[i], is_anonymous).__dict__)
+                            set_sprint_config('members', team_nominations_dict)
+                            save_sprint_configs_into_file()
+                            return True
+                    else:
+                        st.info('Write your feedback for the star.')
     return False
 
 def display_result(reveal_result = False, sprint_date=TODAY):
@@ -216,7 +220,7 @@ def display_result(reveal_result = False, sprint_date=TODAY):
                             st.markdown(f'- *{nomination["feedback"]}*' + (f' *-{nomination["nominator"]}*' if not nomination["is_anonymous"] else ''))
                     i += 1
         else:
-            st.warning('No one participated today')
+            st.warning('No one participated')
 
 def display_progress(reveal_result):
     global members_list
@@ -249,7 +253,7 @@ def option_host_poll():
 
     if sprint_name:
         set_sprint_default_values()
-        set_sprint_config('name', sprint_name)
+        set_sprint_config('name', sprint_name.strip())
         if not is_poll_open:
             if st.button('Open the poll for nominations', is_poll_open):
                 is_poll_open = True
